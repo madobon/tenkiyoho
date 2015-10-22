@@ -28,27 +28,23 @@ request({
 
     let texts = [];
     let textsArea = createAreaText($);
-    let textsRealtime = createRealtimeWeatherText($, '', '');
-    let textsToday = createWeatherText($today, 'このあとの天気予報をお知らせします。', '以上、今日の天気予報をお知らせしました。');
-    let textsTommorow = createWeatherText($tomorrow, '明日の天気予報をお知らせします。', '以上、明日の天気予報をお知らせしました。');
 
     Array.prototype.push.apply(texts, textsArea);
 
-    if (arg.indexOf('now') !== -1) {
-      Array.prototype.push.apply(texts, textsRealtime);
-    }
-    if (arg.indexOf('today') !== -1) {
-      Array.prototype.push.apply(texts, textsToday);
-    }
-    if (arg.indexOf('tomorrow') !== -1) {
-      Array.prototype.push.apply(texts, textsTommorow);
-    }
+    let hasNoArgs = arg.indexOf('now') === -1 &&
+                    arg.indexOf('today') === -1 &&
+                    arg.indexOf('tomorrow') === -1;
 
-    if (arg.indexOf('now') === -1 &&
-        arg.indexOf('today') === -1 &&
-        arg.indexOf('tomorrow') === -1) {
+    if (arg.indexOf('now') !== -1 || hasNoArgs) {
+      let textsRealtime = createRealtimeWeatherText($, '', '');
       Array.prototype.push.apply(texts, textsRealtime);
+    }
+    if (arg.indexOf('today') !== -1 || hasNoArgs) {
+      let textsToday = createWeatherText($today, 'このあとの天気予報をお知らせします。', '以上、今日の天気予報をお知らせしました。');
       Array.prototype.push.apply(texts, textsToday);
+    }
+    if (arg.indexOf('tomorrow') !== -1 || hasNoArgs) {
+      let textsTommorow = createWeatherText($tomorrow, '明日の天気予報をお知らせします。', '以上、明日の天気予報をお知らせしました。');
       Array.prototype.push.apply(texts, textsTommorow);
     }
 
