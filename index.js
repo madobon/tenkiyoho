@@ -78,12 +78,6 @@ function createAreaText($) {
 }
 
 function createRealtimeWeatherText($, prefix, suffix) {
-  // .BtnLock
-  // .WeatherBtn #sunBtn
-  // .WeatherBtn #cloudsBtn
-  // .WeatherBtn #rainBtn
-  // .WeatherBtn #snowBtn
-  // .RankArrow.MaxCurrent
 
   var body = [];
   if (prefix) body.push(prefix);

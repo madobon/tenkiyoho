@@ -4,6 +4,9 @@
   "description": "talk weather news.",
   "main": "index.js",
   "scripts": {
+    "clean": "gulp clean",
+    "watch": "gulp watch",
+    "start": "gulp",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "madobon",
