@@ -53,7 +53,18 @@ request({
 
 function talk(texts) {
   console.log(texts);
-  let mei = new jtalk();
+  let mei = new jtalk({
+    // htsvoice        : './node_modules/openjtalk/voice/mei/mei_happy.htsvoice',
+    // dic             : './dic/open_jtalk_dic_utf_8-1.08',
+    sampling_rate   : 48000,
+    pitch           : 200,
+    audio_buff_size : 48000,
+    alpha           : 0.5,
+    beta            : 0.5,
+    uv_threshold    : 0.5,
+    gv_weight_mgc   : 1.0,
+    gv_weight_lf0   : 1.0
+  });
 
   let _talk = function(texts) {
     let i = arguments[1] || 0;
