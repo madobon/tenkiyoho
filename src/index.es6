@@ -1,60 +1,122 @@
 let request = require('request'),
     cheerio = require('cheerio'),
-    jtalk = require('openjtalk');
+    jtalk = require('openjtalk'),
+    http = require('http'),
+    express = require("express"),
+    bodyParser = require('body-parser'),
+    WebSocketServer = require("ws").Server;
 
-let $;
+let app = express(),
+    port = process.env.PORT || 5000,
+    $,
+    connects = [],
+    isTalking = false;
 
-let arg = process.argv;
+app.use(express.static(__dirname + "/"));
+// parse application/x-www-form-urlencoded
+app.use(bodyParser.urlencoded({ extended: false }))
+// parse application/json
+app.use(bodyParser.json())
 
-let url = 'http://weather.yahoo.co.jp/weather/jp/14/4610/14133.html';
+let server = http.createServer(app);
+server.listen(port);
+console.log("http server listening on %d", port);
 
-arg.some(function(val){
-  if (/^http/.test(val)) {
-    url = val;
-    return true;
+// app.post('/execute', function(req, res){
+//   let body = req.body;
+//   console.log(body);
+//   execute(body.args);
+//   res.send(req.body);
+// });
+
+var wss = new WebSocketServer({server: server});
+console.log("websocket server created");
+
+wss.on("connection", function(ws) {
+
+  console.log("websocket connection open");
+  connects.push(ws);
+  console.log('connects: %d', connects.length);
+
+  ws.on("close", function() {
+    console.log("websocket connection close");
+    closeConnection(ws);
+  })
+
+  ws.on('message', function(message) {
+    let obj = JSON.parse(message);
+    obj && execute(ws, obj);
+  });
+
+  function closeConnection(conn) {
+    connects = connects.filter(function (connect, i) {
+        return (connect === conn) ? false : true;
+    });
+    console.log('connects: %d', connects.length);
   }
 });
 
-request({
-    method: 'GET',
-    url: url
-}, function(err, response, body) {
-    if (err) return console.error(err);
+function broadcast(conn, message, func, self) {
+  for (let connect of connects) {
+    if (!self && connect === conn) continue;
+    connect.send(JSON.stringify(message), func);
+  }
+}
 
-    $ = cheerio.load(body);
+function execute(conn, obj) {
 
-    let $today = $('#yjw_pinpoint_today');
-    let $tomorrow = $('#yjw_pinpoint_tomorrow');
+  let args = obj.args;
 
-    let texts = [];
-    let textsArea = createAreaText($);
+  if (!args) {
+    return;
+  }
 
-    Array.prototype.push.apply(texts, textsArea);
+  request({
+      method: 'GET',
+      url: obj.url || 'http://weather.yahoo.co.jp/weather/jp/14/4610/14133.html'
+  }, function(err, response, body) {
+      if (err) return console.error(err);
 
-    let hasNoArgs = arg.indexOf('now') === -1 &&
-                    arg.indexOf('today') === -1 &&
-                    arg.indexOf('tomorrow') === -1;
+      $ = cheerio.load(body);
 
-    if (arg.indexOf('now') !== -1 || hasNoArgs) {
-      let textsRealtime = createRealtimeWeatherText($, '', '');
-      Array.prototype.push.apply(texts, textsRealtime);
-    }
-    if (arg.indexOf('today') !== -1 || hasNoArgs) {
-      let textsToday = createWeatherText($today, 'このあとの天気予報をお知らせします。', '以上、今日の天気予報をお知らせしました。');
-      Array.prototype.push.apply(texts, textsToday);
-    }
-    if (arg.indexOf('tomorrow') !== -1 || hasNoArgs) {
-      let textsTommorow = createWeatherText($tomorrow, '明日の天気予報をお知らせします。', '以上、明日の天気予報をお知らせしました。');
-      Array.prototype.push.apply(texts, textsTommorow);
-    }
+      let $today = $('#yjw_pinpoint_today');
+      let $tomorrow = $('#yjw_pinpoint_tomorrow');
 
-    talk(texts);
-});
+      let texts = [];
 
-function talk(texts) {
+      let textsArea = createAreaText($);
+
+      Array.prototype.push.apply(texts, textsArea);
+
+      let hasNoArgs = args.indexOf('now') === -1 &&
+                      args.indexOf('today') === -1 &&
+                      args.indexOf('tomorrow') === -1;
+
+      if (args.indexOf('now') !== -1 || hasNoArgs) {
+        let textsRealtime = createRealtimeWeatherText($, '', '');
+        Array.prototype.push.apply(texts, textsRealtime);
+      }
+      if (args.indexOf('today') !== -1 || hasNoArgs) {
+        let textsToday = createWeatherText($today, 'このあとの天気予報をお知らせします。', '以上、今日の天気予報をお知らせしました。');
+        Array.prototype.push.apply(texts, textsToday);
+      }
+      if (args.indexOf('tomorrow') !== -1 || hasNoArgs) {
+        let textsTommorow = createWeatherText($tomorrow, '明日の天気予報をお知らせします。', '以上、明日の天気予報をお知らせしました。');
+        Array.prototype.push.apply(texts, textsTommorow);
+      }
+
+      talk(conn, texts);
+  });
+}
+
+function talk(conn, texts) {
+  if (isTalking) {
+    return;
+  }
   console.log(texts);
+  isTalking = true;
   let mei = new jtalk({
-    // htsvoice        : './node_modules/openjtalk/voice/mei/mei_happy.htsvoice',
+    // htsvoice        : './voice/mei/mei_happy.htsvoice',
     // dic             : './dic/open_jtalk_dic_utf_8-1.08',
     sampling_rate   : 48000,
     pitch           : 200,
@@ -68,14 +130,20 @@ function talk(texts) {
 
   let _talk = function(texts) {
     let i = arguments[1] || 0;
-    if (texts.length < i + 1) return;
-    mei.talk(texts[i], function(err) {
+    if (texts.length < i + 1) {
+      isTalking = false;
+      return;
+    }
+    let text = texts[i];
+    broadcast(conn, text, function(){}, true);
+    mei.talk(text, function(err) {
       if (err) console.log('err', err);
       _talk(texts, ++i);
     });
   }
 
   _talk(texts);
+  return texts;
 }
 
 function createAreaText($) {
