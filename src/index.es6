@@ -1,38 +1,63 @@
-let request = require('request'),
-    cheerio = require('cheerio'),
-    jtalk = require('openjtalk'),
-    http = require('http'),
-    express = require("express"),
-    bodyParser = require('body-parser'),
-    WebSocketServer = require("ws").Server;
+// http://qiita.com/inuscript/items/41168a50904242005271
+import path from 'path';
+import request from 'request';
+import cheerio from 'cheerio';
+import jtalk from 'openjtalk';
+import http from 'http';
+import express from "express";
+import bodyParser from 'body-parser';
+import {Server as WebSocketServer} from "ws";
+import passport from 'passport';
+import {BasicStrategy} from 'passport-http';
+import db from './db';
 
 let app = express(),
     port = process.env.PORT || 5000,
     $,
     connects = [],
-    isTalking = false;
+    isTalking = false,
+    users = [];
 
-app.use(express.static(__dirname + "/"));
+const WEEK = ["日","月","火","水","木","金","土"];
+
+passport.use(new BasicStrategy(
+  (username, password, done) => {
+    db.users.findByUsername(username, (err, user) => {
+      if (err) return done(err);
+      if (!user) return done(null, false);
+      if (user.password !== password) return done(null, false);
+      return done(null, user);
+    });
+  }
+));
+
+app.set('views', path.join(__dirname, 'views'));
+app.set('view engine', 'ejs');
+
+app.use(express.static(path.join(__dirname, 'public')));
+
 // parse application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({ extended: false }))
 // parse application/json
 app.use(bodyParser.json())
 
+app.get('/',
+  passport.authenticate('basic', { session: false }),
+  function (req, res) {
+    res.render('index', {});
+  }
+);
+
 let server = http.createServer(app);
 server.listen(port);
 console.log("http server listening on %d", port);
-
-// app.post('/execute', function(req, res){
-//   let body = req.body;
-//   console.log(body);
-//   execute(body.args);
-//   res.send(req.body);
-// });
 
 var wss = new WebSocketServer({server: server});
 console.log("websocket server created");
 
 wss.on("connection", function(ws) {
+
+  broadcast(ws, {message: '', talking: isTalking}, function(){}, true);
 
   console.log("websocket connection open");
   connects.push(ws);
@@ -132,10 +157,22 @@ function talk(conn, texts) {
     let i = arguments[1] || 0;
     if (texts.length < i + 1) {
       isTalking = false;
+      broadcast(conn, {message: '', talking: isTalking}, function(){}, true);
       return;
     }
     let text = texts[i];
-    broadcast(conn, text, function(){}, true);
+
+    var $li = $('<li />');
+    var now　=　new Date();
+    var nowMon = zeroPadding(now.getMonth() + 1);
+    var nowDay = zeroPadding(now.getDate());
+    var nowWeek = now.getDay();
+    var nowHour = zeroPadding(now.getHours());
+    var nowMin = zeroPadding(now.getMinutes());
+    var nowSec = zeroPadding(now.getSeconds());
+    var nowDate = "["+nowMon+"月"+nowDay+"日("+WEEK[nowWeek]+") "+nowHour+":"+nowMin+":"+nowSec+"] ";
+
+    broadcast(conn, {message: nowDate + text, talking: isTalking}, function(){}, true);
     mei.talk(text, function(err) {
       if (err) console.log('err', err);
       _talk(texts, ++i);
@@ -144,6 +181,10 @@ function talk(conn, texts) {
 
   _talk(texts);
   return texts;
+}
+
+function zeroPadding(val) {
+  return ("0" + val).slice(-2);
 }
 
 function createAreaText($) {

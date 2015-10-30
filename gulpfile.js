@@ -24,14 +24,14 @@ gulp.task('babel', function () {
 
 // html
 gulp.task('html', function () {
-  return gulp.src('src/**/*.html')
+  return gulp.src('src/**/*.{html,ejs}')
     .pipe(gulp.dest('./dest'));
 });
 
 // watch
 gulp.task('watch', function() {
   gulp.watch('src/**/*.es6', ['babel'])
-  gulp.watch('src/**/*.html', ['html'])
+  gulp.watch('src/**/*.{html,ejs}', ['html'])
 });
 
 // defautl

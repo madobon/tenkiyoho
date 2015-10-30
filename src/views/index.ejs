@@ -1,0 +1,87 @@
+<html>
+  <head>
+    <meta charset="utf-8">
+    <style>
+      body {
+        font-family: "Helvetica Neue", helvetica, arial;
+        padding: 15px;
+      }
+
+      ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      ul li {
+        line-height: 1.4;
+      }
+    </style>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.0.0-alpha1/jquery.min.js"></script>
+    <title></title>
+  </head>
+  <body>
+    <select id="extension" class="" name="">
+      <option value="http://weather.yahoo.co.jp/weather/jp/14/4610/14102.html">横浜市神奈川区</option>
+      <option value="http://weather.yahoo.co.jp/weather/jp/14/4610/14133.html">川崎市中原区</option>
+      <option value="http://weather.yahoo.co.jp/weather/jp/14/4610/14114.html">横浜市瀬谷区</option>
+      <option value="http://weather.yahoo.co.jp/weather/jp/14/4610/14213.html">大和市</option>
+    </select>
+    <input type="button" id="button-now" value="現在"/>
+    <input type="button" id="button-today" value="これから"/>
+    <input type="button" id="button-tommorow" value="明日"/>
+    <ul id="res-message"></ul>
+  </body>
+  <script>
+    $(function(){
+      var isTalking = false;
+
+      var host = location.origin.replace(/^http/, 'ws')
+
+      var ws = new WebSocket(host);
+
+      ws.onopen = function () {
+        console.info('connected');
+      };
+
+      ws.onmessage = function (event) {
+        var data = JSON.parse(event.data);
+
+        isTalking = data.talking;
+
+        if (isTalking) {
+          var $li = $('<li />');
+          $li.text(data.message);
+          $('#res-message').append($li);
+          $('title').text('[通話中] 家政婦のふちこ');
+        } else {
+          $('title').text('[待機中] 家政婦のふちこ');
+        }
+      };
+
+      $('#button-now').on('click', function(e){
+        send({args: ['now']});
+      });
+
+      $('#button-today').on('click', function(e){
+        send({args: ['today']});
+      });
+
+      $('#button-tommorow').on('click', function(e){
+        send({args: ['tomorrow']});
+      });
+
+      function send(object) {
+        if (isTalking) {
+          return;
+        }
+        object.url = $('#extension').val();
+        ws.send(JSON.stringify(object));
+      }
+
+      function zeroPadding(val) {
+        return ("0" + val).slice(-2);
+      }
+    });
+  </script>
+</html>
